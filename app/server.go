@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"fmt"
 	"fmt"
 	"net"
 	"os"
@@ -9,54 +8,47 @@ import (
 )
 
 func main() {
-	server, err := net.Listen("tcp", "localhost:4221") // change this for the real one
+	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
+		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
-
-	var conn, err2 = server.Accept()
-	if err2 != nil {
-		return
-	}
-
-	defer server.Close()
-	buff := make([]byte, 1024)
-	_, err = conn.Read(buff)
-	if err != nil {
-		return
-	}
-
-	defer conn.Close()
-	headers := make(map[string]string)
-	request := strings.Split(string(buff), "\n")
-	head := strings.Split(request[0], " ")
-	for _, val := range request[1:] {
-		if !strings.Contains(val, ":") {
-			break
+	fmt.Println("Listening on port 4221")
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
 		}
-		print(strings.Split(val, " ")[0])
-		headers[strings.Split(val, " ")[0]] = strings.Trim(strings.Split(val, " ")[1], "\r")
-
+		go handleConnections(conn)
 	}
-	var response []byte
-	if len(head[1]) > 5 && head[1][:6] == "/echo/" {
-		str := head[1][6:]
-		length := len(str)
-		rsp := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s\r\n", length, str)
-		response = []byte(rsp)
-	} else if head[1] == "/user-agent" {
-		str := headers["User-Agent:"]
-		length := len(str)
-		rsp := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s\r\n", length, str)
-
-		response = []byte(rsp)
-	} else if head[1] == "/" {
-		response = []byte("HTTP/1.1 200 OK\r\n\r\n")
-	} else {
-		response = []byte("HTTP/1.1 404 Not Found\r\n\r\n")
-	}
-	_, err = conn.Write(response)
+}
+func handleConnections(conn net.Conn) {
+	fmt.Println("Established connection with", conn.RemoteAddr())
+	defer conn.Close()
+	buff := make([]byte, 1024)
+	_, err := conn.Read(buff)
 	if err != nil {
-		return
+		fmt.Println(err.Error())
+	}
+	request := string(buff)
+	handleRequest(request, conn)
+}
+func handleRequest(request string, conn net.Conn) {
+	path := strings.Split(request, " ")[1]
+	switch {
+	case path == "/":
+		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	case strings.HasPrefix(path, "/echo/"):
+		text := strings.Split(path, "/echo/")[1]
+		response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %v\r\n\r\n%v\r\n\r\n", len(text), text)
+		conn.Write([]byte(response))
+	case path == "/user-agent":
+		temp := strings.Split(request, "User-Agent: ")[1]
+		user_agent := strings.Split(temp, "\r")[0]
+		response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %v\r\n\r\n%v\r\n\r\n", len(user_agent), user_agent)
+		conn.Write([]byte(response))
+	default:
+		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
 }
