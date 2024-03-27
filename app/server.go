@@ -1,33 +1,33 @@
 package main
 
 import (
-	"fmt"
-	// Uncomment this block to pass the first stage
+	//"fmt"
 	"net"
 	"os"
 )
 
 func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
-
-	// Uncomment this block to pass the first stage
-	//
-	l, err := net.Listen("tcp", "0.0.0.0:4221")
+	server, err := net.Listen("tcp", "localhost:4221") // change this for the real one
 	if err != nil {
-		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
 
-	_, err = l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+	var conn, err2 = server.Accept()
+	if err2 != nil {
+		return
 	}
-	conn, err := l.Accept()
+
+	defer server.Close()
+	buff := make([]byte, 1024)
+	_, err = conn.Read(buff)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return
 	}
-	conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+
+	defer conn.Close()
+	_, err = conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	if err != nil {
+
+		return
+	}
 }
