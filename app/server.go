@@ -2,6 +2,7 @@ package main
 
 import (
 	//"fmt"
+	"fmt"
 	"net"
 	"os"
 	"strings"
@@ -26,12 +27,21 @@ func main() {
 	}
 
 	defer conn.Close()
-	request := string(buff)
-	path := strings.Split(request, " ")[1]
-	if path == "/" {
-		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-	} else {
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+	request := strings.Split(strings.Split(string(buff), "\n")[0], " ")
+	var response []byte
+	if len(request[1]) > 5 && request[1][:6] == "/echo/" {
+		str := request[1][6:]
+		length := len(str)
+		rsp := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s\r\n", length, str)
+		response = []byte(rsp)
 
+	} else if request[1] == "/" {
+		response = []byte("HTTP/1.1 200 OK\r\n\r\n")
+	} else {
+		response = []byte("HTTP/1.1 404 Not Found\r\n\r\n")
+	}
+	_, err = conn.Write(response)
+	if err != nil {
+		return
 	}
 }
